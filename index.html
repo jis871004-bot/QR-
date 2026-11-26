@@ -6,7 +6,7 @@
   <title>출하 QR 중량 검수</title>
   <meta property="og:title" content="출하 QR 중량 검수" />
   <meta property="og:description" content="출하 품목 QR 중량 및 LOT 검수 화면" />
-  <meta property="og:image" content="https://jis871004-bot.github.io/logo.png?v=5" />
+  <meta property="og:image" content="https://jis871004-bot.github.io/logo.png" />
   <meta property="og:type" content="website" />
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
@@ -76,7 +76,7 @@
   <div id="oxBadge"></div>
 
   <div class="header-box">
-    <img src="./logo.png?v=5" alt="JS Tech Co.,Ltd." class="logo-img" onerror="this.style.display='none'">
+    <img src="./logo.png" alt="JS Tech Co.,Ltd." class="logo-img">
     <h2>출하 QR 연속 검수</h2>
   </div>
   <div class="stats">
@@ -120,6 +120,20 @@
     let audioCtx = null;
     let hasLogged = false;
     const seenCodes = new Set();
+
+    // 영문 뒤 첫 번째 숫자가 0이면 '일수', 1이면 '무수' 반환
+    function getHydrateType(code) {
+      const m = (code || "").trim().match(/^[A-Za-z]+(\d)/);
+      if (!m) return "";
+      if (m[1] === "0") return "일수";
+      if (m[1] === "1") return "무수";
+      return "";
+    }
+
+    function formatHydrateSuffix(code) {
+      const h = getHydrateType(code);
+      return h ? ` /${h}` : "";
+    }
 
     function formatTimeNow() {
       const d = new Date();
@@ -255,14 +269,15 @@
       const code = (parts[3] || "").trim();
       const pLot = (parts[P_LOT_INDEX] || "").trim();
       const pLotLabel = pLot || "-";
+      const hydrateSuffix = formatHydrateSuffix(code);
       const rule = PRODUCT_RULES[code];
 
       if (!rule) {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "⚠️ 미등록 " + pLotLabel + " / " + qrWeight + "kg<span class='sub'>LOT : " + lot + " / " + code + "</span>";
-        appendLog(false, `미등록 ${pLotLabel} / ${qrWeight}kg`, `LOT : ${lot} / ${code}`, trimmed);
+        resBox.innerHTML = "⚠️ 미등록 " + pLotLabel + " / " + qrWeight + "kg" + hydrateSuffix + "<span class='sub'>LOT : " + lot + " / " + code + "</span>";
+        appendLog(false, `미등록 ${pLotLabel} / ${qrWeight}kg${hydrateSuffix}`, `LOT : ${lot} / ${code}`, trimmed);
         return;
       }
 
@@ -270,14 +285,14 @@
         updateStats(true);
         triggerAction(true);
         resBox.className = "ok";
-        resBox.innerHTML = "✅ 정상 " + pLotLabel + " / " + rule.weight + "kg<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
-        appendLog(true, `정상 ${pLotLabel} / ${rule.weight}kg`, `LOT : ${lot} / ${rule.name}`, trimmed);
+        resBox.innerHTML = "✅ 정상 " + pLotLabel + " / " + rule.weight + "kg" + hydrateSuffix + "<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
+        appendLog(true, `정상 ${pLotLabel} / ${rule.weight}kg${hydrateSuffix}`, `LOT : ${lot} / ${rule.name}`, trimmed);
       } else {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "🚨 불일치 " + pLotLabel + " / QR " + qrWeight + "kg (기준 " + rule.weight + "kg)<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
-        appendLog(false, `불일치 ${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)`, `LOT : ${lot} / ${rule.name}`, trimmed);
+        resBox.innerHTML = "🚨 불일치 " + pLotLabel + " / QR " + qrWeight + "kg (기준 " + rule.weight + "kg)" + hydrateSuffix + "<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
+        appendLog(false, `불일치 ${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)${hydrateSuffix}`, `LOT : ${lot} / ${rule.name}`, trimmed);
       }
     }
 
