@@ -20,7 +20,22 @@
     .ok { background: #e6f9ed !important; border-color: #16a34a !important; color: #15803d !important; }
     .ng { background: #fee2e2 !important; border-color: #dc2626 !important; color: #b91c1c !important; }
     .sub { display: block; font-size: 14px; font-weight: normal; margin-top: 6px; color: #222; }
-    button { margin-top: 12px; padding: 10px 20px; font-size: 16px; border: none; border-radius: 10px; background: #374151; color: #fff; font-weight: bold; cursor: pointer; }
+    .btns { display: flex; justify-content: center; gap: 8px; max-width: 420px; margin: 10px auto 0; }
+    button { padding: 10px 16px; font-size: 15px; border: none; border-radius: 10px; background: #374151; color: #fff; font-weight: bold; cursor: pointer; }
+
+    /* 하단 검수 로그 리스트 */
+    .log-wrap {
+      max-width: 420px; margin: 14px auto 0; text-align: left;
+      background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 10px 12px;
+    }
+    .log-title { font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 8px; }
+    .log-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; font-size: 13px; }
+    .log-item { padding: 7px 6px; border-bottom: 1px solid #eef0f2; line-height: 1.35; }
+    .log-item:last-child { border-bottom: none; }
+    .log-ok { color: #15803d; font-weight: bold; }
+    .log-ng { color: #b91c1c; font-weight: bold; }
+    .log-dup { color: #b45309; font-weight: bold; }
+    .log-meta { color: #4b5563; display: block; font-size: 12px; }
 
     /* 화면 전체 번쩍임 & 큰 O / X 오버레이 */
     #flashOverlay {
@@ -55,7 +70,16 @@
   </div>
   <div id="reader"></div>
   <div id="result">후면 카메라로 QR 코드를 비춰주세요</div>
-  <button onclick="resetCounts()">카운트 초기화</button>
+  <div class="btns">
+    <button onclick="resetCounts()">카운트 및 로그 초기화</button>
+  </div>
+
+  <div class="log-wrap">
+    <div class="log-title">검수 이력 (최신순 · 화면 캡처용)</div>
+    <ul id="logList" class="log-list">
+      <li class="log-item" style="color:#6b7280;">스캔 내역이 여기에 쌓입니다.</li>
+    </ul>
+  </div>
 
   <script>
     const PRODUCT_RULES = {
@@ -76,6 +100,34 @@
     let lastText = "";
     let lastTime = 0;
     let audioCtx = null;
+    let hasLogged = false;
+    const seenCodes = new Set();
+
+    function formatTimeNow() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function appendLog(isOk, summaryText, detailText, rawText) {
+      const list = document.getElementById("logList");
+      if (!hasLogged) {
+        list.innerHTML = "";
+        hasLogged = true;
+      }
+      const isDup = seenCodes.has(rawText);
+      seenCodes.add(rawText);
+
+      const li = document.createElement("li");
+      li.className = "log-item";
+      const badgeClass = isOk ? "log-ok" : "log-ng";
+      const dupHtml = isDup ? ` <span class="log-dup">[중복]</span>` : "";
+      li.innerHTML = `
+        <span class="${badgeClass}">#${totalCnt} ${summaryText}</span>${dupHtml}
+        <span class="log-meta">${formatTimeNow()} · ${detailText}</span>
+      `;
+      list.prepend(li);
+    }
 
     function getAudioCtx() {
       if (!audioCtx) {
@@ -166,7 +218,8 @@
       lastText = decodedText;
       lastTime = now;
 
-      const parts = decodedText.trim().split("#");
+      const trimmed = decodedText.trim();
+      const parts = trimmed.split("#");
       const resBox = document.getElementById("result");
 
       if (parts.length < 4) {
@@ -174,6 +227,7 @@
         triggerAction(false);
         resBox.className = "ng";
         resBox.innerHTML = "🚨 형식 오류<span class='sub'>" + decodedText + "</span>";
+        appendLog(false, "형식오류", trimmed, trimmed);
         return;
       }
 
@@ -187,6 +241,7 @@
         triggerAction(false);
         resBox.className = "ng";
         resBox.innerHTML = "⚠️ 미등록 코드 (" + code + ")<span class='sub'>QR중량: " + qrWeight + "kg / LOT: " + lot + "</span>";
+        appendLog(false, `미등록 (${code})`, `QR ${qrWeight}kg · LOT ${lot}`, trimmed);
         return;
       }
 
@@ -195,19 +250,23 @@
         triggerAction(true);
         resBox.className = "ok";
         resBox.innerHTML = "✅ 정상 (" + rule.name + " / " + rule.weight + "kg)<span class='sub'>LOT: " + lot + "</span>";
+        appendLog(true, `정상 (${rule.name} / ${rule.weight}kg)`, `LOT: ${lot}`, trimmed);
       } else {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
         resBox.innerHTML = "🚨 불일치! (" + rule.name + ")<br>QR: " + qrWeight + "kg / 기준: " + rule.weight + "kg<span class='sub'>LOT: " + lot + "</span>";
+        appendLog(false, `불일치 (${rule.name})`, `QR ${qrWeight}kg / 기준 ${rule.weight}kg · LOT ${lot}`, trimmed);
       }
     }
 
     function resetCounts() {
-      totalCnt = 0; okCnt = 0; ngCnt = 0; lastText = "";
+      totalCnt = 0; okCnt = 0; ngCnt = 0; lastText = ""; hasLogged = false;
+      seenCodes.clear();
       document.getElementById("cntTotal").textContent = 0;
       document.getElementById("cntOk").textContent = 0;
       document.getElementById("cntNg").textContent = 0;
+      document.getElementById("logList").innerHTML = '<li class="log-item" style="color:#6b7280;">스캔 내역이 여기에 쌓입니다.</li>';
       const resBox = document.getElementById("result");
       resBox.className = "";
       resBox.innerHTML = "후면 카메라로 QR 코드를 비춰주세요";
