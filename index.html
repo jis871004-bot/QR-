@@ -14,7 +14,7 @@
     #reader { width: 100%; max-width: 420px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
     #result {
       margin: 12px auto 0; max-width: 420px; padding: 18px 14px;
-      border-radius: 14px; font-size: 22px; font-weight: bold;
+      border-radius: 14px; font-size: 20px; font-weight: bold;
       background: #fff; border: 3px solid #ccc; line-height: 1.4;
     }
     .ok { background: #e6f9ed !important; border-color: #16a34a !important; color: #15803d !important; }
@@ -29,13 +29,14 @@
       background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 10px 12px;
     }
     .log-title { font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 8px; }
-    .log-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; font-size: 13px; }
-    .log-item { padding: 7px 6px; border-bottom: 1px solid #eef0f2; line-height: 1.35; }
+    .log-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; font-size: 13px; }
+    .log-item { padding: 8px 6px; border-bottom: 1px solid #eef0f2; line-height: 1.4; }
     .log-item:last-child { border-bottom: none; }
+    .log-head { margin-bottom: 3px; }
     .log-ok { color: #15803d; font-weight: bold; }
     .log-ng { color: #b91c1c; font-weight: bold; }
     .log-dup { color: #b45309; font-weight: bold; }
-    .log-meta { color: #4b5563; display: block; font-size: 12px; }
+    .log-line { color: #374151; display: block; font-size: 12.5px; }
 
     /* 화면 전체 번쩍임 & 큰 O / X 오버레이 */
     #flashOverlay {
@@ -96,7 +97,6 @@
       "MLHR0113": { name: "MLHR0113", weight: 300 }
     };
 
-    // P_LOT가 들어있는 '#' 구분 인덱스 (기본 4번째 칸 -> parts[4])
     const P_LOT_INDEX = 4;
 
     let totalCnt = 0, okCnt = 0, ngCnt = 0;
@@ -112,7 +112,7 @@
       return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
-    function appendLog(isOk, summaryText, detailText, rawText) {
+    function appendLog(isOk, topLineText, bottomLineText, rawText) {
       const list = document.getElementById("logList");
       if (!hasLogged) {
         list.innerHTML = "";
@@ -125,9 +125,10 @@
       li.className = "log-item";
       const badgeClass = isOk ? "log-ok" : "log-ng";
       const dupHtml = isDup ? ` <span class="log-dup">[중복]</span>` : "";
+
       li.innerHTML = `
-        <span class="${badgeClass}">#${totalCnt} ${summaryText}</span>${dupHtml}
-        <span class="log-meta">${formatTimeNow()} · ${detailText}</span>
+        <div class="log-head"><span class="${badgeClass}">#${totalCnt} ${topLineText}</span>${dupHtml}</div>
+        <span class="log-line">${formatTimeNow()} · ${bottomLineText}</span>
       `;
       list.prepend(li);
     }
@@ -234,20 +235,19 @@
         return;
       }
 
-      const lot = parts[1].trim();
+      const lot = (parts[1] || "").trim();
       const qrWeight = parseFloat(parts[2]);
-      const code = parts[3].trim();
+      const code = (parts[3] || "").trim();
       const pLot = (parts[P_LOT_INDEX] || "").trim();
-      const pLotText = pLot ? ` / P_LOT: ${pLot}` : "";
-      const pLotLogText = pLot ? ` · P_LOT: ${pLot}` : "";
+      const pLotLabel = pLot || "-";
       const rule = PRODUCT_RULES[code];
 
       if (!rule) {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "⚠️ 미등록 코드 (" + code + ")<span class='sub'>QR중량: " + qrWeight + "kg / LOT: " + lot + pLotText + "</span>";
-        appendLog(false, `미등록 (${code})`, `QR ${qrWeight}kg · LOT ${lot}${pLotLogText}`, trimmed);
+        resBox.innerHTML = "⚠️ 미등록 " + pLotLabel + " / " + qrWeight + "kg<span class='sub'>LOT : " + lot + " / " + code + "</span>";
+        appendLog(false, `미등록 ${pLotLabel} / ${qrWeight}kg`, `LOT : ${lot} / ${code}`, trimmed);
         return;
       }
 
@@ -255,14 +255,14 @@
         updateStats(true);
         triggerAction(true);
         resBox.className = "ok";
-        resBox.innerHTML = "✅ 정상 (" + rule.name + " / " + rule.weight + "kg)<span class='sub'>LOT: " + lot + pLotText + "</span>";
-        appendLog(true, `정상 (${rule.name} / ${rule.weight}kg)`, `LOT: ${lot}${pLotLogText}`, trimmed);
+        resBox.innerHTML = "✅ 정상 " + pLotLabel + " / " + rule.weight + "kg<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
+        appendLog(true, `정상 ${pLotLabel} / ${rule.weight}kg`, `LOT : ${lot} / ${rule.name}`, trimmed);
       } else {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "🚨 불일치! (" + rule.name + ")<br>QR: " + qrWeight + "kg / 기준: " + rule.weight + "kg<span class='sub'>LOT: " + lot + pLotText + "</span>";
-        appendLog(false, `불일치 (${rule.name})`, `QR ${qrWeight}kg / 기준 ${rule.weight}kg · LOT ${lot}${pLotLogText}`, trimmed);
+        resBox.innerHTML = "🚨 불일치 " + pLotLabel + " / QR " + qrWeight + "kg (기준 " + rule.weight + "kg)<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
+        appendLog(false, `불일치 ${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)`, `LOT : ${lot} / ${rule.name}`, trimmed);
       }
     }
 
