@@ -96,6 +96,9 @@
       "MLHR0113": { name: "MLHR0113", weight: 300 }
     };
 
+    // P_LOT가 들어있는 '#' 구분 인덱스 (기본 4번째 칸 -> parts[4])
+    const P_LOT_INDEX = 4;
+
     let totalCnt = 0, okCnt = 0, ngCnt = 0;
     let lastText = "";
     let lastTime = 0;
@@ -231,17 +234,20 @@
         return;
       }
 
-      const lot = parts[1];
+      const lot = parts[1].trim();
       const qrWeight = parseFloat(parts[2]);
       const code = parts[3].trim();
+      const pLot = (parts[P_LOT_INDEX] || "").trim();
+      const pLotText = pLot ? ` / P_LOT: ${pLot}` : "";
+      const pLotLogText = pLot ? ` · P_LOT: ${pLot}` : "";
       const rule = PRODUCT_RULES[code];
 
       if (!rule) {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "⚠️ 미등록 코드 (" + code + ")<span class='sub'>QR중량: " + qrWeight + "kg / LOT: " + lot + "</span>";
-        appendLog(false, `미등록 (${code})`, `QR ${qrWeight}kg · LOT ${lot}`, trimmed);
+        resBox.innerHTML = "⚠️ 미등록 코드 (" + code + ")<span class='sub'>QR중량: " + qrWeight + "kg / LOT: " + lot + pLotText + "</span>";
+        appendLog(false, `미등록 (${code})`, `QR ${qrWeight}kg · LOT ${lot}${pLotLogText}`, trimmed);
         return;
       }
 
@@ -249,14 +255,14 @@
         updateStats(true);
         triggerAction(true);
         resBox.className = "ok";
-        resBox.innerHTML = "✅ 정상 (" + rule.name + " / " + rule.weight + "kg)<span class='sub'>LOT: " + lot + "</span>";
-        appendLog(true, `정상 (${rule.name} / ${rule.weight}kg)`, `LOT: ${lot}`, trimmed);
+        resBox.innerHTML = "✅ 정상 (" + rule.name + " / " + rule.weight + "kg)<span class='sub'>LOT: " + lot + pLotText + "</span>";
+        appendLog(true, `정상 (${rule.name} / ${rule.weight}kg)`, `LOT: ${lot}${pLotLogText}`, trimmed);
       } else {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "🚨 불일치! (" + rule.name + ")<br>QR: " + qrWeight + "kg / 기준: " + rule.weight + "kg<span class='sub'>LOT: " + lot + "</span>";
-        appendLog(false, `불일치 (${rule.name})`, `QR ${qrWeight}kg / 기준 ${rule.weight}kg · LOT ${lot}`, trimmed);
+        resBox.innerHTML = "🚨 불일치! (" + rule.name + ")<br>QR: " + qrWeight + "kg / 기준: " + rule.weight + "kg<span class='sub'>LOT: " + lot + pLotText + "</span>";
+        appendLog(false, `불일치 (${rule.name})`, `QR ${qrWeight}kg / 기준 ${rule.weight}kg · LOT ${lot}${pLotLogText}`, trimmed);
       }
     }
 
