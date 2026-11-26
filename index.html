@@ -97,7 +97,7 @@
     </ul>
   </div>
 
-  <script>
+ <script>
     const PRODUCT_RULES = {
       "MLHA0113": { name: "MLHA0113", weight: 300 },
       "MLHA1114": { name: "MLHA1114", weight: 200 },
@@ -119,9 +119,22 @@
     let lastTime = 0;
     let audioCtx = null;
     let hasLogged = false;
+    let isStartingCam = false;
+    let html5QrCode = null;
     const seenCodes = new Set();
 
-    // 영문 뒤 첫 번째 숫자가 0이면 '일수', 1이면 '무수' 반환
+    function showErrorBox(title, detail) {
+      const resBox = document.getElementById("result");
+      if (resBox) {
+        resBox.className = "ng";
+        resBox.innerHTML = `<span class="c-red">${title}</span><span class="sub">${detail}</span>`;
+      }
+    }
+
+    window.addEventListener("error", (e) => {
+      showErrorBox("⚠️ 스크립트 오류", e.message || String(e));
+    });
+
     function getHydrateType(code) {
       const m = (code || "").trim().match(/^[A-Za-z]+(\d)/);
       if (!m) return "";
@@ -130,9 +143,11 @@
       return "";
     }
 
-    function formatHydrateSuffix(code) {
+    function buildHydrateHtml(code) {
       const h = getHydrateType(code);
-      return h ? ` /${h}` : "";
+      if (!h) return "";
+      const cls = h === "일수" ? "c-ils" : "c-musu";
+      return `<span class="c-blue"> / </span><span class="${cls}">${h}</span>`;
     }
 
     function formatTimeNow() {
@@ -141,7 +156,7 @@
       return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
-    function appendLog(isOk, topLineText, bottomLineText, rawText) {
+    function appendLog(topHtml, bottomLineText, rawText) {
       const list = document.getElementById("logList");
       if (!hasLogged) {
         list.innerHTML = "";
@@ -152,11 +167,10 @@
 
       const li = document.createElement("li");
       li.className = "log-item";
-      const badgeClass = isOk ? "log-ok" : "log-ng";
-      const dupHtml = isDup ? ` <span class="log-dup">[중복]</span>` : "";
+      const dupHtml = isDup ? ` <span class="log-dup c-red">[중복]</span>` : "";
 
       li.innerHTML = `
-        <div class="log-head"><span class="${badgeClass}">#${totalCnt} ${topLineText}</span>${dupHtml}</div>
+        <div class="log-head"><span class="c-blue">#${totalCnt}</span> ${topHtml}${dupHtml}</div>
         <span class="log-line">${formatTimeNow()} · ${bottomLineText}</span>
       `;
       list.prepend(li);
@@ -259,8 +273,9 @@
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "🚨 형식 오류<span class='sub'>" + decodedText + "</span>";
-        appendLog(false, "형식오류", trimmed, trimmed);
+        const errTopHtml = `<span class="c-red">🚨 형식 오류</span>`;
+        resBox.innerHTML = `${errTopHtml}<span class='sub'>${decodedText}</span>`;
+        appendLog(errTopHtml, trimmed, trimmed);
         return;
       }
 
@@ -269,15 +284,16 @@
       const code = (parts[3] || "").trim();
       const pLot = (parts[P_LOT_INDEX] || "").trim();
       const pLotLabel = pLot || "-";
-      const hydrateSuffix = formatHydrateSuffix(code);
+      const hydrateHtml = buildHydrateHtml(code);
       const rule = PRODUCT_RULES[code];
 
       if (!rule) {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "⚠️ 미등록 " + pLotLabel + " / " + qrWeight + "kg" + hydrateSuffix + "<span class='sub'>LOT : " + lot + " / " + code + "</span>";
-        appendLog(false, `미등록 ${pLotLabel} / ${qrWeight}kg${hydrateSuffix}`, `LOT : ${lot} / ${code}`, trimmed);
+        const unregTopHtml = `<span class="c-red">⚠️ 미등록</span> <span class="c-blue">${pLotLabel} / ${qrWeight}kg</span>${hydrateHtml}`;
+        resBox.innerHTML = `${unregTopHtml}<span class='sub'>LOT : ${lot} / ${code}</span>`;
+        appendLog(unregTopHtml, `LOT : ${lot} / ${code}`, trimmed);
         return;
       }
 
@@ -285,14 +301,16 @@
         updateStats(true);
         triggerAction(true);
         resBox.className = "ok";
-        resBox.innerHTML = "✅ 정상 " + pLotLabel + " / " + rule.weight + "kg" + hydrateSuffix + "<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
-        appendLog(true, `정상 ${pLotLabel} / ${rule.weight}kg${hydrateSuffix}`, `LOT : ${lot} / ${rule.name}`, trimmed);
+        const okTopHtml = `<span class="c-blue">✅ 정상 ${pLotLabel} / ${rule.weight}kg</span>${hydrateHtml}`;
+        resBox.innerHTML = `${okTopHtml}<span class='sub'>LOT : ${lot} / ${rule.name}</span>`;
+        appendLog(okTopHtml, `LOT : ${lot} / ${rule.name}`, trimmed);
       } else {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
-        resBox.innerHTML = "🚨 불일치 " + pLotLabel + " / QR " + qrWeight + "kg (기준 " + rule.weight + "kg)" + hydrateSuffix + "<span class='sub'>LOT : " + lot + " / " + rule.name + "</span>";
-        appendLog(false, `불일치 ${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)${hydrateSuffix}`, `LOT : ${lot} / ${rule.name}`, trimmed);
+        const ngTopHtml = `<span class="c-red">🚨 불일치</span> <span class="c-blue">${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)</span>${hydrateHtml}`;
+        resBox.innerHTML = `${ngTopHtml}<span class='sub'>LOT : ${lot} / ${rule.name}</span>`;
+        appendLog(ngTopHtml, `LOT : ${lot} / ${rule.name}`, trimmed);
       }
     }
 
@@ -302,23 +320,44 @@
       document.getElementById("cntTotal").textContent = 0;
       document.getElementById("cntOk").textContent = 0;
       document.getElementById("cntNg").textContent = 0;
-      document.getElementById("logList").innerHTML = '<li class="log-item" style="color:#6b7280;">스캔 내역이 여기에 쌓입니다.</li>';
+      document.getElementById("logList").innerHTML = '<li class="log-item" style="color:#111827;">스캔 내역이 여기에 쌓입니다.</li>';
       const resBox = document.getElementById("result");
       resBox.className = "";
       resBox.innerHTML = "후면 카메라로 QR 코드를 비춰주세요";
     }
 
-    const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 15, qrbox: { width: 240, height: 240 } },
-      onScanSuccess,
-      () => {}
-    ).catch((err) => {
-      const resBox = document.getElementById("result");
-      resBox.className = "ng";
-      resBox.innerHTML = "⚠️ 카메라 시작 실패<span class='sub'>브라우저 카메라 권한을 확인하세요 (" + err + ")</span>";
+    async function startCamera() {
+      if (isStartingCam) return;
+      isStartingCam = true;
+
+      try {
+        if (typeof Html5Qrcode === "undefined") {
+          showErrorBox("⚠️ 라이브러리 로드 실패", "html5-qrcode 스크립트를 불러오지 못했습니다. 네트워크를 확인하세요.");
+          return;
+        }
+        if (!html5QrCode) {
+          html5QrCode = new Html5Qrcode("reader");
+        }
+        try {
+          if (html5QrCode.isScanning) {
+            await html5QrCode.stop();
+          }
+        } catch (stopErr) {}
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 15, qrbox: { width: 240, height: 240 } },
+          onScanSuccess,
+          () => {}
+        );
+      } catch (err) {
+        showErrorBox("⚠️ 카메라 시작 실패", String(err));
+      } finally {
+        isStartingCam = false;
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      startCamera();
     });
   </script>
-</body>
-</html>
