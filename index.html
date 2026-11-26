@@ -9,6 +9,11 @@
   <meta property="og:image" content="https://jis871004-bot.github.io/logo.png" />
   <meta property="og:type" content="website" />
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
+    if (typeof Html5Qrcode === "undefined") {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/html5-qrcode/html5-qrcode.min.js"><\/script>');
+    }
+  </script>
   <style>
     body { font-family: sans-serif; text-align: center; margin: 0; padding: 14px; background: #f4f6f8; overflow-x: hidden; color: #111827; }
     .header-box {
@@ -23,7 +28,7 @@
     h2 { margin: 0; font-size: 20px; color: #111827; }
     .stats { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; font-size: 15px; font-weight: bold; }
     .stat-box { background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; color: #111827; }
-    #reader { width: 100%; max-width: 420px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
+    #reader { width: 100%; max-width: 420px; min-height: 180px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
     #result {
       margin: 12px auto 0; max-width: 420px; padding: 18px 14px;
       border-radius: 14px; font-size: 20px; font-weight: bold;
@@ -157,7 +162,6 @@
 
     const P_LOT_INDEX = 4;
 
-    // 스캔 이력은 시간순(오래된 것 -> 최신 것)으로 보관하고, 화면에는 최신순으로 렌더링
     let scanRecords = [];
     let lastText = "";
     let lastTime = 0;
@@ -173,11 +177,18 @@
       }
     }
 
+    function showStatusBox(title, detail) {
+      const resBox = document.getElementById("result");
+      if (resBox) {
+        resBox.className = "";
+        resBox.innerHTML = `<span class="c-black">${title}</span><span class="sub c-black">${detail}</span>`;
+      }
+    }
+
     window.addEventListener("error", (e) => {
       showErrorBox("⚠️ 스크립트 오류", e.message || String(e));
     });
 
-    // 영문 뒤 첫 번째 숫자가 0이면 '일수', 1이면 '무수' 반환
     function getHydrateType(code) {
       const m = (code || "").trim().match(/^[A-Za-z]+(\d)/);
       if (!m) return "";
@@ -186,7 +197,6 @@
       return "";
     }
 
-    // 슬래시는 파란색, 일수(진한 노란색) / 무수(진한 녹색) 반환
     function buildHydrateHtml(code) {
       const h = getHydrateType(code);
       if (!h) return "";
@@ -194,7 +204,6 @@
       return `<span class="c-blue"> / </span><span class="${cls}">${h}</span>`;
     }
 
-    // 텍스트 출력용 순수 문자열 생성
     function buildHydratePlain(code) {
       const h = getHydrateType(code);
       return h ? ` / ${h}` : "";
@@ -240,7 +249,6 @@
         return;
       }
 
-      // 최신순 표시
       const reversed = [...enriched].reverse();
       list.innerHTML = reversed.map((item) => {
         const dupHtml = item.isDup ? ` <span class="log-dup c-red">[중복]</span>` : "";
@@ -301,9 +309,7 @@
             text: text
           });
           return;
-        } catch (err) {
-          // 사용자가 공유 시트를 닫은 경우는 아래 텍스트 박스/복사로 자연스럽게 이어짐
-        }
+        } catch (err) {}
       }
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -491,10 +497,11 @@
     async function startCamera() {
       if (isStartingCam) return;
       isStartingCam = true;
+      showStatusBox("카메라 켜는 중...", "잠시만 기다려 주세요");
 
       try {
         if (typeof Html5Qrcode === "undefined") {
-          showErrorBox("⚠️ 라이브러리 로드 실패", "html5-qrcode 스크립트를 불러오지 못했습니다. 네트워크를 확인하세요.");
+          showErrorBox("⚠️ 라이브러리 로드 실패", "기본 브라우저(크롬·삼성 인터넷)로 열거나 네트워크를 확인하세요.");
           return;
         }
         if (!html5QrCode) {
@@ -512,6 +519,7 @@
           onScanSuccess,
           () => {}
         );
+        showStatusBox("후면 카메라로 QR 코드를 비춰주세요", "스캔 준비 완료");
       } catch (err) {
         showErrorBox("⚠️ 카메라 시작 실패", String(err));
       } finally {
