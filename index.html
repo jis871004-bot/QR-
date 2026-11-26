@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
   <meta property="og:type" content="website" />
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; margin: 0; padding: 14px; background: #f4f6f8; overflow-x: hidden; }
+    body { font-family: sans-serif; text-align: center; margin: 0; padding: 14px; background: #f4f6f8; overflow-x: hidden; color: #111827; }
     .header-box {
       display: inline-flex; align-items: center; justify-content: center;
       gap: 10px; margin: 4px auto 10px;
@@ -20,35 +20,41 @@
       background: #fff; padding: 3px 6px; border-radius: 8px;
       border: 1px solid #d1d5db;
     }
-    h2 { margin: 0; font-size: 20px; }
+    h2 { margin: 0; font-size: 20px; color: #111827; }
     .stats { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; font-size: 15px; font-weight: bold; }
-    .stat-box { background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; }
+    .stat-box { background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; color: #111827; }
     #reader { width: 100%; max-width: 420px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
     #result {
       margin: 12px auto 0; max-width: 420px; padding: 18px 14px;
       border-radius: 14px; font-size: 20px; font-weight: bold;
-      background: #fff; border: 3px solid #ccc; line-height: 1.4;
+      background: #fff; border: 3px solid #ccc; line-height: 1.4; color: #111827;
     }
-    .ok { background: #e6f9ed !important; border-color: #16a34a !important; color: #15803d !important; }
-    .ng { background: #fee2e2 !important; border-color: #dc2626 !important; color: #b91c1c !important; }
-    .sub { display: block; font-size: 14px; font-weight: normal; margin-top: 6px; color: #222; }
-    .btns { display: flex; justify-content: center; gap: 8px; max-width: 420px; margin: 10px auto 0; }
-    button { padding: 10px 16px; font-size: 15px; border: none; border-radius: 10px; background: #374151; color: #fff; font-weight: bold; cursor: pointer; }
+    .ok { background: #e6f9ed !important; border-color: #16a34a !important; }
+    .ng { background: #fee2e2 !important; border-color: #dc2626 !important; }
+    .sub { display: block; font-size: 14px; font-weight: normal; margin-top: 6px; color: #111827; }
+    .btns { display: flex; justify-content: center; gap: 8px; max-width: 420px; margin: 10px auto 0; flex-wrap: wrap; }
+    button { padding: 10px 14px; font-size: 14px; border: none; border-radius: 10px; background: #374151; color: #fff; font-weight: bold; cursor: pointer; }
+    button.cam-btn { background: #1d4ed8; }
+
+    /* 텍스트 색상 전용 클래스 (글자 크기·굵기 유지) */
+    .c-blue { color: #1d4ed8; }
+    .c-red { color: #dc2626; }
+    .c-black { color: #111827; }
+    .c-ils { color: #a16207; }   /* 일수: 진한 노란색 */
+    .c-musu { color: #15803d; }  /* 무수: 진한 녹색 */
 
     /* 하단 검수 로그 리스트 */
     .log-wrap {
       max-width: 420px; margin: 14px auto 0; text-align: left;
       background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 10px 12px;
     }
-    .log-title { font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 8px; }
+    .log-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; }
     .log-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; font-size: 13px; }
-    .log-item { padding: 8px 6px; border-bottom: 1px solid #eef0f2; line-height: 1.4; }
+    .log-item { padding: 8px 6px; border-bottom: 1px solid #eef0f2; line-height: 1.4; color: #111827; }
     .log-item:last-child { border-bottom: none; }
-    .log-head { margin-bottom: 3px; }
-    .log-ok { color: #15803d; font-weight: bold; }
-    .log-ng { color: #b91c1c; font-weight: bold; }
-    .log-dup { color: #b45309; font-weight: bold; }
-    .log-line { color: #374151; display: block; font-size: 12.5px; }
+    .log-head { margin-bottom: 3px; font-weight: bold; }
+    .log-dup { font-weight: bold; }
+    .log-line { color: #111827; display: block; font-size: 12.5px; }
 
     /* 화면 전체 번쩍임 & 큰 O / X 오버레이 */
     #flashOverlay {
@@ -87,17 +93,18 @@
   <div id="reader"></div>
   <div id="result">후면 카메라로 QR 코드를 비춰주세요</div>
   <div class="btns">
+    <button class="cam-btn" onclick="startCamera()">카메라 다시 켜기</button>
     <button onclick="resetCounts()">카운트 및 로그 초기화</button>
   </div>
 
   <div class="log-wrap">
     <div class="log-title">검수 이력 (최신순 · 화면 캡처용)</div>
     <ul id="logList" class="log-list">
-      <li class="log-item" style="color:#6b7280;">스캔 내역이 여기에 쌓입니다.</li>
+      <li class="log-item" style="color:#111827;">스캔 내역이 여기에 쌓입니다.</li>
     </ul>
   </div>
 
- <script>
+  <script>
     const PRODUCT_RULES = {
       "MLHA0113": { name: "MLHA0113", weight: 300 },
       "MLHA1114": { name: "MLHA1114", weight: 200 },
@@ -127,7 +134,7 @@
       const resBox = document.getElementById("result");
       if (resBox) {
         resBox.className = "ng";
-        resBox.innerHTML = `<span class="c-red">${title}</span><span class="sub">${detail}</span>`;
+        resBox.innerHTML = `<span class="c-red">${title}</span><span class="sub c-black">${detail}</span>`;
       }
     }
 
@@ -135,6 +142,7 @@
       showErrorBox("⚠️ 스크립트 오류", e.message || String(e));
     });
 
+    // 영문 뒤 첫 번째 숫자가 0이면 '일수', 1이면 '무수' 반환
     function getHydrateType(code) {
       const m = (code || "").trim().match(/^[A-Za-z]+(\d)/);
       if (!m) return "";
@@ -143,6 +151,7 @@
       return "";
     }
 
+    // 슬래시는 파란색, 일수(진한 노란색) / 무수(진한 녹색) 반환
     function buildHydrateHtml(code) {
       const h = getHydrateType(code);
       if (!h) return "";
@@ -171,7 +180,7 @@
 
       li.innerHTML = `
         <div class="log-head"><span class="c-blue">#${totalCnt}</span> ${topHtml}${dupHtml}</div>
-        <span class="log-line">${formatTimeNow()} · ${bottomLineText}</span>
+        <span class="log-line c-black">${formatTimeNow()} · ${bottomLineText}</span>
       `;
       list.prepend(li);
     }
@@ -274,7 +283,7 @@
         triggerAction(false);
         resBox.className = "ng";
         const errTopHtml = `<span class="c-red">🚨 형식 오류</span>`;
-        resBox.innerHTML = `${errTopHtml}<span class='sub'>${decodedText}</span>`;
+        resBox.innerHTML = `${errTopHtml}<span class="sub c-black">${decodedText}</span>`;
         appendLog(errTopHtml, trimmed, trimmed);
         return;
       }
@@ -292,7 +301,7 @@
         triggerAction(false);
         resBox.className = "ng";
         const unregTopHtml = `<span class="c-red">⚠️ 미등록</span> <span class="c-blue">${pLotLabel} / ${qrWeight}kg</span>${hydrateHtml}`;
-        resBox.innerHTML = `${unregTopHtml}<span class='sub'>LOT : ${lot} / ${code}</span>`;
+        resBox.innerHTML = `${unregTopHtml}<span class="sub c-black">LOT : ${lot} / ${code}</span>`;
         appendLog(unregTopHtml, `LOT : ${lot} / ${code}`, trimmed);
         return;
       }
@@ -302,14 +311,14 @@
         triggerAction(true);
         resBox.className = "ok";
         const okTopHtml = `<span class="c-blue">✅ 정상 ${pLotLabel} / ${rule.weight}kg</span>${hydrateHtml}`;
-        resBox.innerHTML = `${okTopHtml}<span class='sub'>LOT : ${lot} / ${rule.name}</span>`;
+        resBox.innerHTML = `${okTopHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
         appendLog(okTopHtml, `LOT : ${lot} / ${rule.name}`, trimmed);
       } else {
         updateStats(false);
         triggerAction(false);
         resBox.className = "ng";
         const ngTopHtml = `<span class="c-red">🚨 불일치</span> <span class="c-blue">${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)</span>${hydrateHtml}`;
-        resBox.innerHTML = `${ngTopHtml}<span class='sub'>LOT : ${lot} / ${rule.name}</span>`;
+        resBox.innerHTML = `${ngTopHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
         appendLog(ngTopHtml, `LOT : ${lot} / ${rule.name}`, trimmed);
       }
     }
@@ -320,7 +329,7 @@
       document.getElementById("cntTotal").textContent = 0;
       document.getElementById("cntOk").textContent = 0;
       document.getElementById("cntNg").textContent = 0;
-      document.getElementById("logList").innerHTML = '<li class="log-item" style="color:#111827;">스캔 내역이 여기에 쌓입니다.</li>';
+      document.getElementById("logList").innerHTML = '<li class="log-item c-black">스캔 내역이 여기에 쌓입니다.</li>';
       const resBox = document.getElementById("result");
       resBox.className = "";
       resBox.innerHTML = "후면 카메라로 QR 코드를 비춰주세요";
@@ -361,3 +370,5 @@
       startCamera();
     });
   </script>
+</body>
+</html>
