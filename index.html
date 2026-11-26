@@ -9,11 +9,6 @@
   <meta property="og:image" content="https://jis871004-bot.github.io/logo.png" />
   <meta property="og:type" content="website" />
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <script>
-    if (typeof Html5Qrcode === "undefined") {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/html5-qrcode/html5-qrcode.min.js"><\/script>');
-    }
-  </script>
   <style>
     body { font-family: sans-serif; text-align: center; margin: 0; padding: 14px; background: #f4f6f8; overflow-x: hidden; color: #111827; }
     .header-box {
@@ -28,7 +23,7 @@
     h2 { margin: 0; font-size: 20px; color: #111827; }
     .stats { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; font-size: 15px; font-weight: bold; }
     .stat-box { background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; color: #111827; }
-    #reader { width: 100%; max-width: 420px; min-height: 180px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
+    #reader { width: 100%; max-width: 420px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
     #result {
       margin: 12px auto 0; max-width: 420px; padding: 18px 14px;
       border-radius: 14px; font-size: 20px; font-weight: bold;
@@ -78,4 +73,455 @@
     .export-box.show { display: block; }
     .export-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .export-title { font-size: 13px; font-weight: bold; color: #111827; }
-    .export-actions { display: flex;
+    .export-actions { display: flex; gap: 6px; }
+    .mini-btn { padding: 5px 9px; font-size: 12px; border-radius: 7px; background: #374151; color: #fff; }
+    .export-textarea {
+      width: 100%; box-sizing: border-box; height: 170px; font-size: 12px; line-height: 1.45;
+      padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; color: #111827; background: #f8fafc;
+    }
+
+    /* 화면 전체 번쩍임 & 큰 O / X 오버레이 */
+    #flashOverlay {
+      position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 9998;
+      transition: opacity 0.08s ease-out;
+    }
+    #flashOverlay.flash-ok { background: rgba(34, 197, 94, 0.55); opacity: 1; }
+    #flashOverlay.flash-ng { background: rgba(239, 68, 68, 0.72); opacity: 1; }
+    #flashOverlay.flash-shutter { background: rgba(255, 255, 255, 0.75); opacity: 1; }
+
+    #oxBadge {
+      position: fixed; top: 32%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+      pointer-events: none; opacity: 0; z-index: 9999;
+      font-size: 120px; font-weight: 900; line-height: 1;
+      text-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      transition: transform 0.14s ease-out, opacity 0.14s ease-out;
+    }
+    #oxBadge.show { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    #oxBadge.ox-ok { color: #16a34a; }
+    #oxBadge.ox-ng { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <div id="flashOverlay"></div>
+  <div id="oxBadge"></div>
+
+  <div class="header-box">
+    <img src="./logo.png" alt="JS Tech Co.,Ltd." class="logo-img">
+    <h2>출하 QR 연속 검수</h2>
+  </div>
+  <div class="stats">
+    <div class="stat-box">총 스캔: <span id="cntTotal">0</span></div>
+    <div class="stat-box" style="color:#15803d;">정상: <span id="cntOk">0</span></div>
+    <div class="stat-box" style="color:#b91c1c;">불일치: <span id="cntNg">0</span></div>
+  </div>
+  <div id="reader"></div>
+  <div id="result">후면 카메라로 QR 코드를 비춰주세요</div>
+  <div class="btns">
+    <button class="cam-btn" onclick="startCamera()">카메라 다시 켜기</button>
+    <button class="export-btn" onclick="exportLogsText()">텍스트 출력</button>
+    <button onclick="resetCounts()">카운트 및 로그 초기화</button>
+  </div>
+
+  <div id="exportBox" class="export-box">
+    <div class="export-header">
+      <span class="export-title">검수 이력 텍스트</span>
+      <div class="export-actions">
+        <button class="mini-btn" onclick="copyExportText()">복사</button>
+        <button class="mini-btn" onclick="closeExportBox()">닫기</button>
+      </div>
+    </div>
+    <textarea id="exportArea" class="export-textarea" readonly></textarea>
+  </div>
+
+  <div class="log-wrap">
+    <div class="log-title">검수 이력 (최신순 · 화면 캡처용)</div>
+    <ul id="logList" class="log-list">
+      <li class="log-item c-black">스캔 내역이 여기에 쌓입니다.</li>
+    </ul>
+  </div>
+
+  <script>
+    const PRODUCT_RULES = {
+      "MLHA0113": { name: "MLHA0113", weight: 300 },
+      "MLHA1114": { name: "MLHA1114", weight: 200 },
+      "MLHB0113B": { name: "MLHB0113B", weight: 300 },
+      "MLHB1114": { name: "MLHB1114", weight: 200 },
+      "MLHC0117": { name: "MLHC0117", weight: 300 },
+      "MLHC1114": { name: "MLHC1114", weight: 200 },
+      "MLHD0117": { name: "MLHD0117", weight: 300 },
+      "MLHD1114": { name: "MLHD1114", weight: 200 },
+      "MLHE1114": { name: "MLHE1114", weight: 200 },
+      "MLHF1114": { name: "MLHF1114", weight: 200 },
+      "MLHR0113": { name: "MLHR0113", weight: 300 }
+    };
+
+    const P_LOT_INDEX = 4;
+
+    // 스캔 이력은 시간순(오래된 것 -> 최신 것)으로 보관하고, 화면에는 최신순으로 렌더링
+    let scanRecords = [];
+    let lastText = "";
+    let lastTime = 0;
+    let audioCtx = null;
+    let isStartingCam = false;
+    let html5QrCode = null;
+
+    function showErrorBox(title, detail) {
+      const resBox = document.getElementById("result");
+      if (resBox) {
+        resBox.className = "ng";
+        resBox.innerHTML = `<span class="c-red">${title}</span><span class="sub c-black">${detail}</span>`;
+      }
+    }
+
+    window.addEventListener("error", (e) => {
+      showErrorBox("⚠️ 스크립트 오류", e.message || String(e));
+    });
+
+    // 영문 뒤 첫 번째 숫자가 0이면 '일수', 1이면 '무수' 반환
+    function getHydrateType(code) {
+      const m = (code || "").trim().match(/^[A-Za-z]+(\d)/);
+      if (!m) return "";
+      if (m[1] === "0") return "일수";
+      if (m[1] === "1") return "무수";
+      return "";
+    }
+
+    // 슬래시는 파란색, 일수(진한 노란색) / 무수(진한 녹색) 반환
+    function buildHydrateHtml(code) {
+      const h = getHydrateType(code);
+      if (!h) return "";
+      const cls = h === "일수" ? "c-ils" : "c-musu";
+      return `<span class="c-blue"> / </span><span class="${cls}">${h}</span>`;
+    }
+
+    // 텍스트 출력용 순수 문자열 생성
+    function buildHydratePlain(code) {
+      const h = getHydrateType(code);
+      return h ? ` / ${h}` : "";
+    }
+
+    function formatTimeNow() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function formatDateToday() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function refreshStatsAndLogs() {
+      let okCnt = 0;
+      let ngCnt = 0;
+      const seen = new Set();
+
+      const enriched = scanRecords.map((rec, idx) => {
+        if (rec.isOk) okCnt += 1;
+        else ngCnt += 1;
+
+        const isDup = seen.has(rec.rawText);
+        seen.add(rec.rawText);
+        return {
+          ...rec,
+          seq: idx + 1,
+          isDup
+        };
+      });
+
+      document.getElementById("cntTotal").textContent = scanRecords.length;
+      document.getElementById("cntOk").textContent = okCnt;
+      document.getElementById("cntNg").textContent = ngCnt;
+
+      const list = document.getElementById("logList");
+      if (enriched.length === 0) {
+        list.innerHTML = '<li class="log-item c-black">스캔 내역이 여기에 쌓입니다.</li>';
+        return;
+      }
+
+      // 최신순 표시
+      const reversed = [...enriched].reverse();
+      list.innerHTML = reversed.map((item) => {
+        const dupHtml = item.isDup ? ` <span class="log-dup c-red">[중복]</span>` : "";
+        return `
+          <li class="log-item">
+            <div class="log-content">
+              <div class="log-head"><span class="c-blue">#${item.seq}</span> ${item.topHtml}${dupHtml}</div>
+              <span class="log-line c-black">${item.timeStr} · ${item.bottomLineText}</span>
+            </div>
+            <button class="del-btn" onclick="deleteRecord('${item.id}')">삭제</button>
+          </li>
+        `;
+      }).join("");
+    }
+
+    function deleteRecord(id) {
+      scanRecords = scanRecords.filter((r) => r.id !== id);
+      refreshStatsAndLogs();
+      if (document.getElementById("exportBox").classList.contains("show")) {
+        document.getElementById("exportArea").value = generateExportText();
+      }
+    }
+
+    function generateExportText() {
+      let okCnt = 0;
+      let ngCnt = 0;
+      const seen = new Set();
+      const lines = [];
+
+      scanRecords.forEach((rec, idx) => {
+        if (rec.isOk) okCnt += 1;
+        else ngCnt += 1;
+        const isDup = seen.has(rec.rawText);
+        seen.add(rec.rawText);
+        const dupTag = isDup ? " [중복]" : "";
+        lines.push(`#${idx + 1} ${rec.plainTop}${dupTag} (${rec.timeStr} · ${rec.bottomLineText})`);
+      });
+
+      return [
+        `[출하 QR 중량 검수 내역 - ${formatDateToday()}]`,
+        `총 스캔: ${scanRecords.length} / 정상: ${okCnt} / 불일치: ${ngCnt}`,
+        `----------------------------------------`,
+        lines.length ? lines.join("\n") : "스캔 내역 없음"
+      ].join("\n");
+    }
+
+    async function exportLogsText() {
+      const text = generateExportText();
+      const box = document.getElementById("exportBox");
+      const area = document.getElementById("exportArea");
+      area.value = text;
+      box.classList.add("show");
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "출하 QR 중량 검수 내역",
+            text: text
+          });
+          return;
+        } catch (err) {
+          // 사용자가 공유 시트를 닫은 경우는 아래 텍스트 박스/복사로 자연스럽게 이어짐
+        }
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (e) {}
+      }
+    }
+
+    async function copyExportText() {
+      const area = document.getElementById("exportArea");
+      area.select();
+      area.setSelectionRange(0, area.value.length);
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(area.value);
+        } else {
+          document.execCommand("copy");
+        }
+        alert("검수 텍스트가 복사되었습니다.");
+      } catch (e) {
+        document.execCommand("copy");
+        alert("검수 텍스트를 선택했습니다. 복사해서 붙여넣어 주세요.");
+      }
+    }
+
+    function closeExportBox() {
+      document.getElementById("exportBox").classList.remove("show");
+    }
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    document.addEventListener("touchstart", () => getAudioCtx(), { once: true, passive: true });
+
+    function playSound(isOk) {
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        if (isOk) {
+          [880, 1174.66].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+            gain.gain.setValueAtTime(0.25, now + idx * 0.09);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.11);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.09);
+            osc.stop(now + idx * 0.09 + 0.12);
+          });
+        } else {
+          [320, 220].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(freq, now + idx * 0.16);
+            gain.gain.setValueAtTime(0.3, now + idx * 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.16 + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.16);
+            osc.stop(now + idx * 0.16 + 0.16);
+          });
+        }
+      } catch (e) {}
+    }
+
+    function triggerAction(isOk) {
+      const flash = document.getElementById("flashOverlay");
+      const badge = document.getElementById("oxBadge");
+
+      flash.className = "flash-shutter";
+      setTimeout(() => {
+        flash.className = isOk ? "flash-ok" : "flash-ng";
+      }, 65);
+      setTimeout(() => {
+        flash.className = "";
+      }, 360);
+
+      badge.textContent = isOk ? "O" : "X";
+      badge.className = (isOk ? "ox-ok" : "ox-ng") + " show";
+      setTimeout(() => {
+        badge.className = "";
+      }, 650);
+
+      playSound(isOk);
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(isOk ? [70] : [180, 80, 180]);
+        } catch (e) {}
+      }
+    }
+
+    function addScanRecord(isOk, topHtml, plainTop, bottomLineText, rawText) {
+      const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      scanRecords.push({
+        id,
+        isOk,
+        topHtml,
+        plainTop,
+        bottomLineText,
+        rawText,
+        timeStr: formatTimeNow()
+      });
+      refreshStatsAndLogs();
+      if (document.getElementById("exportBox").classList.contains("show")) {
+        document.getElementById("exportArea").value = generateExportText();
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      const now = Date.now();
+      if (decodedText === lastText && now - lastTime < 1500) return;
+      lastText = decodedText;
+      lastTime = now;
+
+      const trimmed = decodedText.trim();
+      const parts = trimmed.split("#");
+      const resBox = document.getElementById("result");
+
+      if (parts.length < 4) {
+        triggerAction(false);
+        resBox.className = "ng";
+        const errTopHtml = `<span class="c-red">🚨 형식 오류</span>`;
+        resBox.innerHTML = `${errTopHtml}<span class="sub c-black">${decodedText}</span>`;
+        addScanRecord(false, errTopHtml, "형식 오류", trimmed, trimmed);
+        return;
+      }
+
+      const lot = (parts[1] || "").trim();
+      const qrWeight = parseFloat(parts[2]);
+      const code = (parts[3] || "").trim();
+      const pLot = (parts[P_LOT_INDEX] || "").trim();
+      const pLotLabel = pLot || "-";
+      const hydrateHtml = buildHydrateHtml(code);
+      const hydratePlain = buildHydratePlain(code);
+      const rule = PRODUCT_RULES[code];
+
+      if (!rule) {
+        triggerAction(false);
+        resBox.className = "ng";
+        const unregTopHtml = `<span class="c-red">⚠️ 미등록</span> <span class="c-blue">${pLotLabel} / ${qrWeight}kg</span>${hydrateHtml}`;
+        resBox.innerHTML = `${unregTopHtml}<span class="sub c-black">LOT : ${lot} / ${code}</span>`;
+        addScanRecord(false, unregTopHtml, `미등록 ${pLotLabel} / ${qrWeight}kg${hydratePlain}`, `LOT : ${lot} / ${code}`, trimmed);
+        return;
+      }
+
+      if (Math.abs(qrWeight - rule.weight) < 0.001) {
+        triggerAction(true);
+        resBox.className = "ok";
+        const okTopHtml = `<span class="c-blue">✅ 정상 ${pLotLabel} / ${rule.weight}kg</span>${hydrateHtml}`;
+        resBox.innerHTML = `${okTopHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
+        addScanRecord(true, okTopHtml, `정상 ${pLotLabel} / ${rule.weight}kg${hydratePlain}`, `LOT : ${lot} / ${rule.name}`, trimmed);
+      } else {
+        triggerAction(false);
+        resBox.className = "ng";
+        const ngTopHtml = `<span class="c-red">🚨 불일치</span> <span class="c-blue">${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)</span>${hydrateHtml}`;
+        resBox.innerHTML = `${ngTopHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
+        addScanRecord(false, ngTopHtml, `불일치 ${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)${hydratePlain}`, `LOT : ${lot} / ${rule.name}`, trimmed);
+      }
+    }
+
+    function resetCounts() {
+      scanRecords = [];
+      lastText = "";
+      refreshStatsAndLogs();
+      closeExportBox();
+      const resBox = document.getElementById("result");
+      resBox.className = "";
+      resBox.innerHTML = "후면 카메라로 QR 코드를 비춰주세요";
+    }
+
+    async function startCamera() {
+      if (isStartingCam) return;
+      isStartingCam = true;
+
+      try {
+        if (typeof Html5Qrcode === "undefined") {
+          showErrorBox("⚠️ 라이브러리 로드 실패", "html5-qrcode 스크립트를 불러오지 못했습니다. 네트워크를 확인하세요.");
+          return;
+        }
+        if (!html5QrCode) {
+          html5QrCode = new Html5Qrcode("reader");
+        }
+        try {
+          if (html5QrCode.isScanning) {
+            await html5QrCode.stop();
+          }
+        } catch (stopErr) {}
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 15, qrbox: { width: 240, height: 240 } },
+          onScanSuccess,
+          () => {}
+        );
+      } catch (err) {
+        showErrorBox("⚠️ 카메라 시작 실패", String(err));
+      } finally {
+        isStartingCam = false;
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      startCamera();
+    });
+  </script>
+</body>
+</html>
