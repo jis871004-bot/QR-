@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; margin: 0; padding: 14px; background: #f4f6f8; }
+    body { font-family: sans-serif; text-align: center; margin: 0; padding: 14px; background: #f4f6f8; overflow-x: hidden; }
     h2 { margin: 4px 0 10px; font-size: 20px; }
     .stats { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; font-size: 15px; font-weight: bold; }
     .stat-box { background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; }
@@ -19,9 +19,32 @@
     .ng { background: #fee2e2 !important; border-color: #dc2626 !important; color: #b91c1c !important; }
     .sub { display: block; font-size: 14px; font-weight: normal; margin-top: 6px; color: #222; }
     button { margin-top: 12px; padding: 10px 20px; font-size: 16px; border: none; border-radius: 10px; background: #374151; color: #fff; font-weight: bold; cursor: pointer; }
+
+    /* 화면 전체 번쩍임 & 큰 O / X 오버레이 */
+    #flashOverlay {
+      position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 9998;
+      transition: opacity 0.08s ease-out;
+    }
+    #flashOverlay.flash-ok { background: rgba(34, 197, 94, 0.55); opacity: 1; }
+    #flashOverlay.flash-ng { background: rgba(239, 68, 68, 0.72); opacity: 1; }
+    #flashOverlay.flash-shutter { background: rgba(255, 255, 255, 0.75); opacity: 1; }
+
+    #oxBadge {
+      position: fixed; top: 32%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+      pointer-events: none; opacity: 0; z-index: 9999;
+      font-size: 120px; font-weight: 900; line-height: 1;
+      text-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      transition: transform 0.14s ease-out, opacity 0.14s ease-out;
+    }
+    #oxBadge.show { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    #oxBadge.ox-ok { color: #16a34a; }
+    #oxBadge.ox-ng { color: #dc2626; }
   </style>
 </head>
 <body>
+  <div id="flashOverlay"></div>
+  <div id="oxBadge"></div>
+
   <h2>출하 QR 연속 검수</h2>
   <div class="stats">
     <div class="stat-box">총 스캔: <span id="cntTotal">0</span></div>
@@ -29,7 +52,7 @@
     <div class="stat-box" style="color:#b91c1c;">불일치: <span id="cntNg">0</span></div>
   </div>
   <div id="reader"></div>
-  <div id="result">QR 코드를 차례대로 비춰주세요</div>
+  <div id="result">후면 카메라로 QR 코드를 비춰주세요</div>
   <button onclick="resetCounts()">카운트 초기화</button>
 
   <script>
@@ -41,17 +64,87 @@
     let totalCnt = 0, okCnt = 0, ngCnt = 0;
     let lastText = "";
     let lastTime = 0;
+    let audioCtx = null;
 
-    function beep(isOk) {
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    // 첫 터치 시 오디오 잠금 해제
+    document.addEventListener("touchstart", () => getAudioCtx(), { once: true, passive: true });
+
+    function playSound(isOk) {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        osc.type = isOk ? "sine" : "sawtooth";
-        osc.frequency.value = isOk ? 880 : 260;
-        osc.connect(ctx.destination);
-        osc.start();
-        setTimeout(() => { osc.stop(); ctx.close(); }, isOk ? 120 : 400);
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        if (isOk) {
+          // 정상: 밝은 2음(띠-링)
+          [880, 1174.66].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+            gain.gain.setValueAtTime(0.25, now + idx * 0.09);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.11);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.09);
+            osc.stop(now + idx * 0.09 + 0.12);
+          });
+        } else {
+          // 불일치/오류: 경고음(삐용-삐용)
+          [320, 220].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(freq, now + idx * 0.16);
+            gain.gain.setValueAtTime(0.3, now + idx * 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.16 + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.16);
+            osc.stop(now + idx * 0.16 + 0.16);
+          });
+        }
       } catch (e) {}
+    }
+
+    function triggerAction(isOk) {
+      const flash = document.getElementById("flashOverlay");
+      const badge = document.getElementById("oxBadge");
+
+      // 1) 찰칵 느낌의 짧은 화이트 플래시 후 O / X 컬러 번쩍임
+      flash.className = "flash-shutter";
+      setTimeout(() => {
+        flash.className = isOk ? "flash-ok" : "flash-ng";
+      }, 65);
+      setTimeout(() => {
+        flash.className = "";
+      }, 360);
+
+      // 2) 화면 중앙에 큰 O / X 표시
+      badge.textContent = isOk ? "O" : "X";
+      badge.className = (isOk ? "ox-ok" : "ox-ng") + " show";
+      setTimeout(() => {
+        badge.className = "";
+      }, 650);
+
+      // 3) 소리 + 진동
+      playSound(isOk);
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(isOk ? [70] : [180, 80, 180]);
+        } catch (e) {}
+      }
     }
 
     function updateStats(isOk) {
@@ -73,7 +166,7 @@
 
       if (parts.length < 4) {
         updateStats(false);
-        beep(false);
+        triggerAction(false);
         resBox.className = "ng";
         resBox.innerHTML = "🚨 형식 오류<span class='sub'>" + decodedText + "</span>";
         return;
@@ -86,7 +179,7 @@
 
       if (!rule) {
         updateStats(false);
-        beep(false);
+        triggerAction(false);
         resBox.className = "ng";
         resBox.innerHTML = "⚠️ 미등록 코드 (" + code + ")<span class='sub'>QR중량: " + qrWeight + "kg / LOT: " + lot + "</span>";
         return;
@@ -94,12 +187,12 @@
 
       if (Math.abs(qrWeight - rule.weight) < 0.001) {
         updateStats(true);
-        beep(true);
+        triggerAction(true);
         resBox.className = "ok";
         resBox.innerHTML = "✅ 정상 (" + rule.name + " / " + rule.weight + "kg)<span class='sub'>LOT: " + lot + "</span>";
       } else {
         updateStats(false);
-        beep(false);
+        triggerAction(false);
         resBox.className = "ng";
         resBox.innerHTML = "🚨 불일치! (" + rule.name + ")<br>QR: " + qrWeight + "kg / 기준: " + rule.weight + "kg<span class='sub'>LOT: " + lot + "</span>";
       }
@@ -112,16 +205,20 @@
       document.getElementById("cntNg").textContent = 0;
       const resBox = document.getElementById("result");
       resBox.className = "";
-      resBox.innerHTML = "QR 코드를 차례대로 비춰주세요";
+      resBox.innerHTML = "후면 카메라로 QR 코드를 비춰주세요";
     }
 
-    const scanner = new Html5QrcodeScanner("reader", {
-      fps: 15,
-      qrbox: { width: 240, height: 240 },
-      rememberLastUsedCamera: true,
-      supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 15, qrbox: { width: 240, height: 240 } },
+      onScanSuccess,
+      () => {}
+    ).catch((err) => {
+      const resBox = document.getElementById("result");
+      resBox.className = "ng";
+      resBox.innerHTML = "⚠️ 카메라 시작 실패<span class='sub'>브라우저 카메라 권한을 확인하세요 (" + err + ")</span>";
     });
-    scanner.render(onScanSuccess, undefined, false);
   </script>
 </body>
 </html>
