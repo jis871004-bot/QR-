@@ -62,7 +62,8 @@
     }
     .log-item:last-child { border-bottom: none; }
     .log-content { flex: 1; min-width: 0; }
-    .log-head { margin-bottom: 3px; font-weight: bold; }
+    .log-head { margin-bottom: 2px; font-weight: bold; }
+    .log-detail { margin-bottom: 3px; font-weight: bold; }
     .log-dup { font-weight: bold; }
     .log-line { color: #111827; display: block; font-size: 12.5px; }
     .del-btn {
@@ -160,7 +161,6 @@
       "MLHR0113": { name: "MLHR0113", weight: 300, material: "SQM" }
     };
 
-    // LOT 앞 2자리(공장+원료코드) 기준 원료 매핑 (INN/YAH, CXI/ECO 등 복수 원료 구분용)
     const LOT_PREFIX2_MATERIAL = {
       "GG": "GNF",
       "GI": "INN",
@@ -209,19 +209,6 @@
       return "";
     }
 
-    function buildHydrateHtml(code) {
-      const h = getHydrateType(code);
-      if (!h) return "";
-      const cls = h === "일수" ? "c-ils" : "c-musu";
-      return `<span class="c-blue"> / </span><span class="${cls}">${h}</span>`;
-    }
-
-    function buildHydratePlain(code) {
-      const h = getHydrateType(code);
-      return h ? ` / ${h}` : "";
-    }
-
-    // LOT 앞 3자리와 코드를 기준으로 양산품/개발품 및 원료명 산출
     function getProdAndMaterial(pLot, code) {
       const cleanLot = (pLot || "").trim().toUpperCase();
       const prefix3 = cleanLot.slice(0, 3);
@@ -234,17 +221,13 @@
 
       if (!prodType) return { prodType: "", material: "" };
 
-      // 개발품은 원료 표기 제외
       if (prodType === "개발품") {
         return { prodType: "개발품", material: "" };
       }
 
-      // 양산품일 때 원료 결정 (코드 기준 우선, 복수 원료 코드는 LOT 앞 2자리로 세부 구분)
       const rule = PRODUCT_RULES[code];
       let material = "";
-      if (code === "MLHB0113B") {
-        material = LOT_PREFIX2_MATERIAL[prefix2] || (rule ? rule.material : "");
-      } else if (code === "MLHE1114") {
+      if (code === "MLHB0113B" || code === "MLHE1114") {
         material = LOT_PREFIX2_MATERIAL[prefix2] || (rule ? rule.material : "");
       } else if (rule && rule.material) {
         material = rule.material;
@@ -255,18 +238,35 @@
       return { prodType: "양산품", material };
     }
 
-    // 일수/무수 다음 줄에 진한 초록색으로 '/ 양산품 / PPLS' 또는 '/ 개발품' 생성
-    function buildProdMaterialHtml(pLot, code) {
+    // 300kg / 일수/  양산품 / PPLS 형태 HTML 생성
+    function buildWeightSpecHtml(weightText, code, pLot) {
+      const h = getHydrateType(code);
       const { prodType, material } = getProdAndMaterial(pLot, code);
-      if (!prodType) return "";
-      const text = material ? `/ ${prodType} / ${material}` : `/ ${prodType}`;
-      return `<br><span class="c-musu">${text}</span>`;
+      const hCls = h === "일수" ? "c-ils" : "c-musu";
+
+      let html = `<span class="c-blue">${weightText}</span>`;
+      if (h) {
+        html += `<span class="c-blue"> / </span><span class="${hCls}">${h}</span>`;
+      }
+      if (prodType) {
+        const suffix = material ? `/  ${prodType} / ${material}` : `/  ${prodType}`;
+        html += `<span class="c-musu">${suffix}</span>`;
+      }
+      return html;
     }
 
-    function buildProdMaterialPlain(pLot, code) {
+    function buildWeightSpecPlain(weightText, code, pLot) {
+      const h = getHydrateType(code);
       const { prodType, material } = getProdAndMaterial(pLot, code);
-      if (!prodType) return "";
-      return material ? `\n/ ${prodType} / ${material}` : `\n/ ${prodType}`;
+
+      let text = `${weightText}`;
+      if (h) {
+        text += ` / ${h}`;
+      }
+      if (prodType) {
+        text += material ? `/  ${prodType} / ${material}` : `/  ${prodType}`;
+      }
+      return text;
     }
 
     function formatTimeNow() {
@@ -312,10 +312,14 @@
       const reversed = [...enriched].reverse();
       list.innerHTML = reversed.map((item) => {
         const dupHtml = item.isDup ? ` <span class="log-dup c-red">[중복]</span>` : "";
+        const detailHtml = item.detailHtml
+          ? `<div class="log-detail">${item.detailHtml}${dupHtml}</div>`
+          : (dupHtml ? `<div class="log-detail">${dupHtml.trim()}</div>` : "");
         return `
           <li class="log-item">
             <div class="log-content">
-              <div class="log-head"><span class="c-blue">#${item.seq}</span> ${item.topHtml}${dupHtml}</div>
+              <div class="log-head"><span class="c-blue">#${item.seq}</span> ${item.topHtml}</div>
+              ${detailHtml}
               <span class="log-line c-black">${item.timeStr} · ${item.bottomLineText}</span>
             </div>
             <button class="del-btn" onclick="deleteRecord('${item.id}')">삭제</button>
@@ -344,7 +348,8 @@
         const isDup = seen.has(rec.rawText);
         seen.add(rec.rawText);
         const dupTag = isDup ? " [중복]" : "";
-        lines.push(`#${idx + 1} ${rec.plainTop}${dupTag}\n${rec.timeStr} · ${rec.bottomLineText}`);
+        const detailLine = rec.detailPlain ? `\n       ${rec.detailPlain}${dupTag}` : (dupTag ? `\n       ${dupTag.trim()}` : "");
+        lines.push(`#${idx + 1} ${rec.plainTop}${detailLine}\n       ${rec.timeStr} · ${rec.bottomLineText}`);
       });
 
       return [
@@ -475,13 +480,15 @@
       }
     }
 
-    function addScanRecord(isOk, topHtml, plainTop, bottomLineText, rawText) {
+    function addScanRecord(isOk, topHtml, plainTop, detailHtml, detailPlain, bottomLineText, rawText) {
       const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       scanRecords.push({
         id,
         isOk,
         topHtml,
         plainTop,
+        detailHtml,
+        detailPlain,
         bottomLineText,
         rawText,
         timeStr: formatTimeNow()
@@ -507,7 +514,7 @@
         resBox.className = "ng";
         const errTopHtml = `<span class="c-red">🚨 형식 오류</span>`;
         resBox.innerHTML = `${errTopHtml}<span class="sub c-black">${decodedText}</span>`;
-        addScanRecord(false, errTopHtml, "형식 오류", trimmed, trimmed);
+        addScanRecord(false, errTopHtml, "형식 오류", "", "", trimmed, trimmed);
         return;
       }
 
@@ -516,33 +523,38 @@
       const code = (parts[3] || "").trim();
       const pLot = (parts[P_LOT_INDEX] || "").trim();
       const pLotLabel = pLot || "-";
-      const hydrateHtml = buildHydrateHtml(code);
-      const hydratePlain = buildHydratePlain(code);
-      const prodMatHtml = buildProdMaterialHtml(pLot, code);
-      const prodMatPlain = buildProdMaterialPlain(pLot, code);
       const rule = PRODUCT_RULES[code];
 
       if (!rule) {
         triggerAction(false);
         resBox.className = "ng";
-        const unregTopHtml = `<span class="c-red">⚠️ 미등록</span> <span class="c-blue">${pLotLabel} / ${qrWeight}kg</span>${hydrateHtml}${prodMatHtml}`;
-        resBox.innerHTML = `${unregTopHtml}<span class="sub c-black">LOT : ${lot} / ${code}</span>`;
-        addScanRecord(false, unregTopHtml, `미등록 ${pLotLabel} / ${qrWeight}kg${hydratePlain}${prodMatPlain}`, `LOT : ${lot} / ${code}`, trimmed);
+        const topHtml = `<span class="c-red">⚠️ 미등록</span> <span class="c-blue">${pLotLabel}</span>`;
+        const plainTop = `미등록 ${pLotLabel}`;
+        const detailHtml = buildWeightSpecHtml(`${qrWeight}kg`, code, pLot);
+        const detailPlain = buildWeightSpecPlain(`${qrWeight}kg`, code, pLot);
+        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">LOT : ${lot} / ${code}</span>`;
+        addScanRecord(false, topHtml, plainTop, detailHtml, detailPlain, `LOT : ${lot} / ${code}`, trimmed);
         return;
       }
 
       if (Math.abs(qrWeight - rule.weight) < 0.001) {
         triggerAction(true);
         resBox.className = "ok";
-        const okTopHtml = `<span class="c-blue">✅ 정상 ${pLotLabel} / ${rule.weight}kg</span>${hydrateHtml}${prodMatHtml}`;
-        resBox.innerHTML = `${okTopHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
-        addScanRecord(true, okTopHtml, `정상 ${pLotLabel} / ${rule.weight}kg${hydratePlain}${prodMatPlain}`, `LOT : ${lot} / ${rule.name}`, trimmed);
+        const topHtml = `<span class="c-blue">✅ 정상 ${pLotLabel}</span>`;
+        const plainTop = `정상 ${pLotLabel}`;
+        const detailHtml = buildWeightSpecHtml(`${rule.weight}kg`, code, pLot);
+        const detailPlain = buildWeightSpecPlain(`${rule.weight}kg`, code, pLot);
+        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
+        addScanRecord(true, topHtml, plainTop, detailHtml, detailPlain, `LOT : ${lot} / ${rule.name}`, trimmed);
       } else {
         triggerAction(false);
         resBox.className = "ng";
-        const ngTopHtml = `<span class="c-red">🚨 불일치</span> <span class="c-blue">${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)</span>${hydrateHtml}${prodMatHtml}`;
-        resBox.innerHTML = `${ngTopHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
-        addScanRecord(false, ngTopHtml, `불일치 ${pLotLabel} / QR ${qrWeight}kg (기준 ${rule.weight}kg)${hydratePlain}${prodMatPlain}`, `LOT : ${lot} / ${rule.name}`, trimmed);
+        const topHtml = `<span class="c-red">🚨 불일치</span> <span class="c-blue">${pLotLabel}</span>`;
+        const plainTop = `불일치 ${pLotLabel}`;
+        const detailHtml = buildWeightSpecHtml(`QR ${qrWeight}kg (기준 ${rule.weight}kg)`, code, pLot);
+        const detailPlain = buildWeightSpecPlain(`QR ${qrWeight}kg (기준 ${rule.weight}kg)`, code, pLot);
+        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
+        addScanRecord(false, topHtml, plainTop, detailHtml, detailPlain, `LOT : ${lot} / ${rule.name}`, trimmed);
       }
     }
 
