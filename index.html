@@ -30,19 +30,22 @@
     .stat-box { background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; color: #111827; }
     #reader { width: 100%; max-width: 420px; min-height: 180px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
     #result {
-      margin: 12px auto 0; max-width: 420px; padding: 18px 14px;
-      border-radius: 14px; font-size: 20px; font-weight: bold;
+      margin: 12px auto 0; max-width: 420px; padding: 16px 10px;
+      border-radius: 14px; font-size: 17px; font-weight: bold;
       background: #fff; border: 3px solid #ccc; line-height: 1.45; color: #111827;
     }
+    .res-nowrap { display: inline-block; white-space: nowrap; max-width: 100%; }
     .ok { background: #e6f9ed !important; border-color: #16a34a !important; }
     .ng { background: #fee2e2 !important; border-color: #dc2626 !important; }
-    .sub { display: block; font-size: 14px; font-weight: normal; margin-top: 6px; color: #111827; }
+    .sub { display: block; font-size: 13px; font-weight: normal; margin-top: 6px; color: #111827; }
     .btns { display: flex; justify-content: center; gap: 8px; max-width: 420px; margin: 10px auto 0; flex-wrap: wrap; }
     button { padding: 10px 14px; font-size: 14px; border: none; border-radius: 10px; background: #374151; color: #fff; font-weight: bold; cursor: pointer; }
     button.cam-btn { background: #1d4ed8; }
     button.export-btn { background: #0f766e; }
+    button.sel-del-btn { background: #b91c1c; }
+    button.confirm-del-btn { background: #dc2626; }
 
-    /* 텍스트 색상 전용 클래스 (글자 크기·굵기 유지) */
+    /* 텍스트 색상 전용 클래스 */
     .c-blue { color: #1d4ed8; }
     .c-red { color: #dc2626; }
     .c-black { color: #111827; }
@@ -54,22 +57,32 @@
       max-width: 420px; margin: 14px auto 0; text-align: left;
       background: #fff; border: 1px solid #d1d5db; border-radius: 12px; padding: 10px 12px;
     }
-    .log-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; }
-    .log-list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; font-size: 13px; }
+    .log-header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+    .log-title { font-size: 14px; font-weight: bold; color: #111827; margin: 0; }
+    .bulk-bar {
+      display: none; justify-content: space-between; align-items: center;
+      background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
+      padding: 6px 8px; margin-bottom: 8px; font-size: 12.5px; gap: 6px;
+    }
+    .bulk-bar.show { display: flex; }
+    .bulk-actions { display: flex; gap: 6px; }
+    .mini-btn { padding: 5px 9px; font-size: 12px; border-radius: 7px; background: #374151; color: #fff; }
+    .log-list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; font-size: 12.5px; }
     .log-item {
-      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-      padding: 8px 6px; border-bottom: 1px solid #eef0f2; line-height: 1.45; color: #111827;
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 4px; border-bottom: 1px solid #eef0f2; line-height: 1.42; color: #111827;
     }
     .log-item:last-child { border-bottom: none; }
-    .log-content { flex: 1; min-width: 0; }
-    .log-head { margin-bottom: 2px; font-weight: bold; }
-    .log-detail { margin-bottom: 3px; font-weight: bold; }
-    .log-dup { font-weight: bold; }
-    .log-line { color: #111827; display: block; font-size: 12.5px; }
-    .del-btn {
-      flex-shrink: 0; padding: 5px 9px; font-size: 12px; border-radius: 7px;
-      background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-weight: bold;
+    .log-chk {
+      display: none; width: 17px; height: 17px; margin-top: 2px; flex-shrink: 0; cursor: pointer; accent-color: #dc2626;
     }
+    .select-mode .log-chk { display: inline-block; }
+    .log-content { flex: 1; min-width: 0; }
+    .log-head { font-weight: bold; white-space: nowrap; }
+    .log-detail { font-weight: bold; white-space: nowrap; }
+    .log-dup { font-weight: bold; }
+    .log-lot { color: #111827; display: block; font-size: 12px; margin-top: 1px; }
+    .log-time { color: #374151; display: block; font-size: 12px; }
 
     /* 텍스트 출력 영역 */
     .export-box {
@@ -80,11 +93,34 @@
     .export-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .export-title { font-size: 13px; font-weight: bold; color: #111827; }
     .export-actions { display: flex; gap: 6px; }
-    .mini-btn { padding: 5px 9px; font-size: 12px; border-radius: 7px; background: #374151; color: #fff; }
     .export-textarea {
       width: 100%; box-sizing: border-box; height: 170px; font-size: 12px; line-height: 1.45;
       padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; color: #111827; background: #f8fafc;
     }
+
+    /* 잔량 / 불일치 선택 모달 */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55);
+      z-index: 10000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-card {
+      width: 100%; max-width: 340px; background: #fff; border-radius: 14px;
+      padding: 18px 16px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28); text-align: center;
+    }
+    .modal-title { font-size: 17px; font-weight: bold; color: #b91c1c; margin-bottom: 8px; }
+    .modal-desc { font-size: 13.5px; color: #111827; margin-bottom: 14px; line-height: 1.45; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .btn-remnant { flex: 1; background: #15803d; color: #fff; padding: 11px 10px; border-radius: 10px; font-size: 14px; font-weight: bold; }
+    .btn-mismatch { flex: 1; background: #dc2626; color: #fff; padding: 11px 10px; border-radius: 10px; font-size: 14px; font-weight: bold; }
+    .remnant-input-wrap { margin-top: 12px; display: none; text-align: left; }
+    .remnant-input-wrap.show { display: block; }
+    .remnant-input-wrap label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #111827; }
+    .remnant-input {
+      width: 100%; box-sizing: border-box; padding: 9px 10px; font-size: 15px;
+      border: 1.5px solid #9ca3af; border-radius: 8px; color: #111827;
+    }
+    .modal-submit { width: 100%; margin-top: 10px; background: #1d4ed8; color: #fff; padding: 10px; border-radius: 9px; font-size: 14px; font-weight: bold; }
 
     /* 화면 전체 번쩍임 & 큰 O / X 오버레이 */
     #flashOverlay {
@@ -125,6 +161,7 @@
   <div class="btns">
     <button class="cam-btn" onclick="startCamera()">카메라 다시 켜기</button>
     <button class="export-btn" onclick="exportLogsText()">텍스트 출력</button>
+    <button class="sel-del-btn" onclick="toggleSelectMode()">선택 삭제</button>
     <button onclick="resetCounts()">카운트 및 로그 초기화</button>
   </div>
 
@@ -140,10 +177,36 @@
   </div>
 
   <div class="log-wrap">
-    <div class="log-title">검수 이력 (최신순 · 화면 캡처용)</div>
+    <div class="log-header-bar">
+      <div class="log-title">검수 이력 (최신순 · 화면 캡처용)</div>
+    </div>
+    <div id="bulkBar" class="bulk-bar">
+      <span id="selectedCountText">선택된 항목: 0개</span>
+      <div class="bulk-actions">
+        <button class="confirm-del-btn mini-btn" onclick="deleteSelectedRecords()">선택 항목 삭제</button>
+        <button class="mini-btn" onclick="exitSelectMode()">취소</button>
+      </div>
+    </div>
     <ul id="logList" class="log-list">
       <li class="log-item c-black">스캔 내역이 여기에 쌓입니다.</li>
     </ul>
+  </div>
+
+  <!-- 잔량 / 불일치 선택 팝업 -->
+  <div id="remnantModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-title">잔량여부를 확인 하세요</div>
+      <div id="remnantModalDesc" class="modal-desc"></div>
+      <div class="modal-btns">
+        <button class="btn-remnant" onclick="chooseRemnant()">잔량</button>
+        <button class="btn-mismatch" onclick="chooseMismatch()">불일치</button>
+      </div>
+      <div id="remnantInputWrap" class="remnant-input-wrap">
+        <label for="actualWeightInput">실제 무게 입력 (kg)</label>
+        <input id="actualWeightInput" class="remnant-input" type="number" step="any" placeholder="예: 185">
+        <button class="modal-submit" onclick="submitRemnantWeight()">잔량 무게 확정</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -175,6 +238,9 @@
     const P_LOT_INDEX = 4;
 
     let scanRecords = [];
+    let selectedIds = new Set();
+    let isSelectMode = false;
+    let pendingMismatch = null;
     let lastText = "";
     let lastTime = 0;
     let audioCtx = null;
@@ -185,7 +251,7 @@
       const resBox = document.getElementById("result");
       if (resBox) {
         resBox.className = "ng";
-        resBox.innerHTML = `<span class="c-red">${title}</span><span class="sub c-black">${detail}</span>`;
+        resBox.innerHTML = `<span class="c-red res-nowrap">${title}</span><span class="sub c-black">${detail}</span>`;
       }
     }
 
@@ -193,7 +259,7 @@
       const resBox = document.getElementById("result");
       if (resBox) {
         resBox.className = "";
-        resBox.innerHTML = `<span class="c-black">${title}</span><span class="sub c-black">${detail}</span>`;
+        resBox.innerHTML = `<span class="c-black res-nowrap">${title}</span><span class="sub c-black">${detail}</span>`;
       }
     }
 
@@ -238,18 +304,18 @@
       return { prodType: "양산품", material };
     }
 
-    // 300kg / 일수/  양산품 / PPLS 형태 HTML 생성
-    function buildWeightSpecHtml(weightText, code, pLot) {
+    function buildWeightSpecHtml(weightText, code, pLot, useRedWeight = false) {
       const h = getHydrateType(code);
       const { prodType, material } = getProdAndMaterial(pLot, code);
       const hCls = h === "일수" ? "c-ils" : "c-musu";
+      const wCls = useRedWeight ? "c-red" : "c-blue";
 
-      let html = `<span class="c-blue">${weightText}</span>`;
+      let html = `<span class="${wCls}">${weightText}</span>`;
       if (h) {
-        html += `<span class="c-blue"> / </span><span class="${hCls}">${h}</span>`;
+        html += `<span class="${wCls}"> / </span><span class="${hCls}">${h}</span>`;
       }
       if (prodType) {
-        const suffix = material ? `/  ${prodType} / ${material}` : `/  ${prodType}`;
+        const suffix = material ? ` / ${prodType} / ${material}` : ` / ${prodType}`;
         html += `<span class="c-musu">${suffix}</span>`;
       }
       return html;
@@ -264,21 +330,66 @@
         text += ` / ${h}`;
       }
       if (prodType) {
-        text += material ? `/  ${prodType} / ${material}` : `/  ${prodType}`;
+        text += material ? ` / ${prodType} / ${material}` : ` / ${prodType}`;
       }
       return text;
     }
 
-    function formatTimeNow() {
+    // 초 단위 제외: 2026/11/24/13:57 형태
+    function formatDateTimeNoSec() {
       const d = new Date();
       const pad = (n) => String(n).padStart(2, "0");
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
     function formatDateToday() {
       const d = new Date();
       const pad = (n) => String(n).padStart(2, "0");
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function toggleSelectMode() {
+      if (isSelectMode) {
+        exitSelectMode();
+      } else {
+        isSelectMode = true;
+        selectedIds.clear();
+        document.getElementById("bulkBar").classList.add("show");
+        document.getElementById("logList").classList.add("select-mode");
+        updateSelectedCountLabel();
+      }
+    }
+
+    function exitSelectMode() {
+      isSelectMode = false;
+      selectedIds.clear();
+      document.getElementById("bulkBar").classList.remove("show");
+      document.getElementById("logList").classList.remove("select-mode");
+      document.querySelectorAll(".log-chk").forEach((el) => { el.checked = false; });
+      updateSelectedCountLabel();
+    }
+
+    function onCheckboxToggle(id, checked) {
+      if (checked) selectedIds.add(id);
+      else selectedIds.delete(id);
+      updateSelectedCountLabel();
+    }
+
+    function updateSelectedCountLabel() {
+      document.getElementById("selectedCountText").textContent = `선택된 항목: ${selectedIds.size}개`;
+    }
+
+    function deleteSelectedRecords() {
+      if (selectedIds.size === 0) {
+        alert("삭제할 항목을 체크해 주세요.");
+        return;
+      }
+      scanRecords = scanRecords.filter((r) => !selectedIds.has(r.id));
+      exitSelectMode();
+      refreshStatsAndLogs();
+      if (document.getElementById("exportBox").classList.contains("show")) {
+        document.getElementById("exportArea").value = generateExportText();
+      }
     }
 
     function refreshStatsAndLogs() {
@@ -312,28 +423,22 @@
       const reversed = [...enriched].reverse();
       list.innerHTML = reversed.map((item) => {
         const dupHtml = item.isDup ? ` <span class="log-dup c-red">[중복]</span>` : "";
+        const checkedAttr = selectedIds.has(item.id) ? "checked" : "";
         const detailHtml = item.detailHtml
           ? `<div class="log-detail">${item.detailHtml}${dupHtml}</div>`
           : (dupHtml ? `<div class="log-detail">${dupHtml.trim()}</div>` : "");
         return `
           <li class="log-item">
+            <input type="checkbox" class="log-chk" ${checkedAttr} onchange="onCheckboxToggle('${item.id}', this.checked)">
             <div class="log-content">
               <div class="log-head"><span class="c-blue">#${item.seq}</span> ${item.topHtml}</div>
               ${detailHtml}
-              <span class="log-line c-black">${item.timeStr} · ${item.bottomLineText}</span>
+              <span class="log-lot">${item.lotLineText}</span>
+              <span class="log-time">${item.dateTimeStr}</span>
             </div>
-            <button class="del-btn" onclick="deleteRecord('${item.id}')">삭제</button>
           </li>
         `;
       }).join("");
-    }
-
-    function deleteRecord(id) {
-      scanRecords = scanRecords.filter((r) => r.id !== id);
-      refreshStatsAndLogs();
-      if (document.getElementById("exportBox").classList.contains("show")) {
-        document.getElementById("exportArea").value = generateExportText();
-      }
     }
 
     function generateExportText() {
@@ -348,8 +453,8 @@
         const isDup = seen.has(rec.rawText);
         seen.add(rec.rawText);
         const dupTag = isDup ? " [중복]" : "";
-        const detailLine = rec.detailPlain ? `\n       ${rec.detailPlain}${dupTag}` : (dupTag ? `\n       ${dupTag.trim()}` : "");
-        lines.push(`#${idx + 1} ${rec.plainTop}${detailLine}\n       ${rec.timeStr} · ${rec.bottomLineText}`);
+        const detailLine = rec.detailPlain ? `\n${rec.detailPlain}${dupTag}` : (dupTag ? `\n${dupTag.trim()}` : "");
+        lines.push(`#${idx + 1} ${rec.plainTop}${detailLine}\n${rec.lotLineText}\n${rec.dateTimeStr}`);
       });
 
       return [
@@ -480,7 +585,7 @@
       }
     }
 
-    function addScanRecord(isOk, topHtml, plainTop, detailHtml, detailPlain, bottomLineText, rawText) {
+    function addScanRecord(isOk, topHtml, plainTop, detailHtml, detailPlain, lotLineText, rawText) {
       const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       scanRecords.push({
         id,
@@ -489,9 +594,9 @@
         plainTop,
         detailHtml,
         detailPlain,
-        bottomLineText,
+        lotLineText,
         rawText,
-        timeStr: formatTimeNow()
+        dateTimeStr: formatDateTimeNoSec()
       });
       refreshStatsAndLogs();
       if (document.getElementById("exportBox").classList.contains("show")) {
@@ -499,7 +604,68 @@
       }
     }
 
+    function openRemnantModal(data) {
+      pendingMismatch = data;
+      document.getElementById("remnantModalDesc").innerHTML =
+        `${data.pLotLabel} · 스캔 ${data.qrWeight}kg (기준 ${data.rule.weight}kg)`;
+      document.getElementById("remnantInputWrap").classList.remove("show");
+      document.getElementById("actualWeightInput").value = "";
+      document.getElementById("remnantModal").classList.add("show");
+    }
+
+    function chooseRemnant() {
+      document.getElementById("remnantInputWrap").classList.add("show");
+      const inp = document.getElementById("actualWeightInput");
+      inp.focus();
+    }
+
+    function submitRemnantWeight() {
+      if (!pendingMismatch) return;
+      const val = parseFloat(document.getElementById("actualWeightInput").value);
+      if (Number.isNaN(val) || val <= 0) {
+        alert("실제 무게(kg)를 정확히 입력해 주세요.");
+        return;
+      }
+
+      const d = pendingMismatch;
+      pendingMismatch = null;
+      document.getElementById("remnantModal").classList.remove("show");
+
+      const resBox = document.getElementById("result");
+      triggerAction(true);
+      resBox.className = "ok";
+      const topHtml = `<span class="c-blue res-nowrap">✅ 잔량 ${d.pLotLabel}</span>`;
+      const plainTop = `잔량 ${d.pLotLabel}`;
+      const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`잔량 ${val}kg`, d.code, d.pLot, false)}</span>`;
+      const detailPlain = buildWeightSpecPlain(`잔량 ${val}kg`, d.code, d.pLot);
+      const lotLineText = `LOT : ${d.lot} / ${d.rule.name}`;
+
+      resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">${lotLineText}</span>`;
+      addScanRecord(true, topHtml, plainTop, detailHtml, detailPlain, lotLineText, d.trimmed);
+    }
+
+    function chooseMismatch() {
+      if (!pendingMismatch) return;
+      const d = pendingMismatch;
+      pendingMismatch = null;
+      document.getElementById("remnantModal").classList.remove("show");
+
+      const resBox = document.getElementById("result");
+      triggerAction(false);
+      resBox.className = "ng";
+      const topHtml = `<span class="c-red res-nowrap">🚨 불일치 ${d.pLotLabel}</span>`;
+      const plainTop = `불일치 ${d.pLotLabel}`;
+      const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${d.qrWeight}kg (기준 ${d.rule.weight}kg)`, d.code, d.pLot, true)}</span>`;
+      const detailPlain = buildWeightSpecPlain(`${d.qrWeight}kg (기준 ${d.rule.weight}kg)`, d.code, d.pLot);
+      const lotLineText = `LOT : ${d.lot} / ${d.rule.name}`;
+
+      resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">${lotLineText}</span>`;
+      addScanRecord(false, topHtml, plainTop, detailHtml, detailPlain, lotLineText, d.trimmed);
+    }
+
     function onScanSuccess(decodedText) {
+      if (pendingMismatch) return;
+
       const now = Date.now();
       if (decodedText === lastText && now - lastTime < 1500) return;
       lastText = decodedText;
@@ -512,7 +678,7 @@
       if (parts.length < 4) {
         triggerAction(false);
         resBox.className = "ng";
-        const errTopHtml = `<span class="c-red">🚨 형식 오류</span>`;
+        const errTopHtml = `<span class="c-red res-nowrap">🚨 형식 오류</span>`;
         resBox.innerHTML = `${errTopHtml}<span class="sub c-black">${decodedText}</span>`;
         addScanRecord(false, errTopHtml, "형식 오류", "", "", trimmed, trimmed);
         return;
@@ -528,39 +694,45 @@
       if (!rule) {
         triggerAction(false);
         resBox.className = "ng";
-        const topHtml = `<span class="c-red">⚠️ 미등록</span> <span class="c-blue">${pLotLabel}</span>`;
+        const topHtml = `<span class="c-red res-nowrap">⚠️ 미등록 ${pLotLabel}</span>`;
         const plainTop = `미등록 ${pLotLabel}`;
-        const detailHtml = buildWeightSpecHtml(`${qrWeight}kg`, code, pLot);
+        const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${qrWeight}kg`, code, pLot, true)}</span>`;
         const detailPlain = buildWeightSpecPlain(`${qrWeight}kg`, code, pLot);
-        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">LOT : ${lot} / ${code}</span>`;
-        addScanRecord(false, topHtml, plainTop, detailHtml, detailPlain, `LOT : ${lot} / ${code}`, trimmed);
+        const lotLineText = `LOT : ${lot} / ${code}`;
+        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">${lotLineText}</span>`;
+        addScanRecord(false, topHtml, plainTop, detailHtml, detailPlain, lotLineText, trimmed);
         return;
       }
 
       if (Math.abs(qrWeight - rule.weight) < 0.001) {
         triggerAction(true);
         resBox.className = "ok";
-        const topHtml = `<span class="c-blue">✅ 정상 ${pLotLabel}</span>`;
+        const topHtml = `<span class="c-blue res-nowrap">✅ 정상 ${pLotLabel}</span>`;
         const plainTop = `정상 ${pLotLabel}`;
-        const detailHtml = buildWeightSpecHtml(`${rule.weight}kg`, code, pLot);
+        const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${rule.weight}kg`, code, pLot, false)}</span>`;
         const detailPlain = buildWeightSpecPlain(`${rule.weight}kg`, code, pLot);
-        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
-        addScanRecord(true, topHtml, plainTop, detailHtml, detailPlain, `LOT : ${lot} / ${rule.name}`, trimmed);
+        const lotLineText = `LOT : ${lot} / ${rule.name}`;
+        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">${lotLineText}</span>`;
+        addScanRecord(true, topHtml, plainTop, detailHtml, detailPlain, lotLineText, trimmed);
       } else {
-        triggerAction(false);
-        resBox.className = "ng";
-        const topHtml = `<span class="c-red">🚨 불일치</span> <span class="c-blue">${pLotLabel}</span>`;
-        const plainTop = `불일치 ${pLotLabel}`;
-        const detailHtml = buildWeightSpecHtml(`QR ${qrWeight}kg (기준 ${rule.weight}kg)`, code, pLot);
-        const detailPlain = buildWeightSpecPlain(`QR ${qrWeight}kg (기준 ${rule.weight}kg)`, code, pLot);
-        resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">LOT : ${lot} / ${rule.name}</span>`;
-        addScanRecord(false, topHtml, plainTop, detailHtml, detailPlain, `LOT : ${lot} / ${rule.name}`, trimmed);
+        openRemnantModal({
+          lot,
+          qrWeight,
+          code,
+          pLot,
+          pLotLabel,
+          rule,
+          trimmed
+        });
       }
     }
 
     function resetCounts() {
       scanRecords = [];
       lastText = "";
+      pendingMismatch = null;
+      document.getElementById("remnantModal").classList.remove("show");
+      exitSelectMode();
       refreshStatsAndLogs();
       closeExportBox();
       const resBox = document.getElementById("result");
