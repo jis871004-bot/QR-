@@ -45,12 +45,20 @@
     button.sel-del-btn { background: #b91c1c; }
     button.confirm-del-btn { background: #dc2626; }
 
-    /* 텍스트 색상 전용 클래스 */
+    /* 텍스트 색상 및 잔량 형광 하이라이트 전용 클래스 */
     .c-blue { color: #1d4ed8; }
     .c-red { color: #dc2626; }
     .c-black { color: #111827; }
     .c-ils { color: #a16207; }   /* 일수: 진한 노란색 */
     .c-musu { color: #15803d; }  /* 무수 / 양산품·개발품·원료: 진한 녹색 */
+    .hl-remnant {
+      background: #eaff00;
+      color: #111827;
+      padding: 1px 4px;
+      border-radius: 4px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
 
     /* 하단 검수 로그 리스트 */
     .log-wrap {
@@ -304,13 +312,17 @@
       return { prodType: "양산품", material };
     }
 
-    function buildWeightSpecHtml(weightText, code, pLot, useRedWeight = false) {
+    function buildWeightSpecHtml(weightText, code, pLot, options = {}) {
+      const { useRedWeight = false, highlightWeight = false } = options;
       const h = getHydrateType(code);
       const { prodType, material } = getProdAndMaterial(pLot, code);
       const hCls = h === "일수" ? "c-ils" : "c-musu";
       const wCls = useRedWeight ? "c-red" : "c-blue";
+      const wHtml = highlightWeight
+        ? `<span class="hl-remnant">${weightText}</span>`
+        : `<span class="${wCls}">${weightText}</span>`;
 
-      let html = `<span class="${wCls}">${weightText}</span>`;
+      let html = wHtml;
       if (h) {
         html += `<span class="${wCls}"> / </span><span class="${hCls}">${h}</span>`;
       }
@@ -634,9 +646,9 @@
       const resBox = document.getElementById("result");
       triggerAction(true);
       resBox.className = "ok";
-      const topHtml = `<span class="c-blue res-nowrap">✅ 잔량 ${d.pLotLabel}</span>`;
+      const topHtml = `<span class="c-blue res-nowrap">✅ <span class="hl-remnant">잔량 ${d.pLotLabel}</span></span>`;
       const plainTop = `잔량 ${d.pLotLabel}`;
-      const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`잔량 ${val}kg`, d.code, d.pLot, false)}</span>`;
+      const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`잔량 ${val}kg`, d.code, d.pLot, { highlightWeight: true })}</span>`;
       const detailPlain = buildWeightSpecPlain(`잔량 ${val}kg`, d.code, d.pLot);
       const lotLineText = `LOT : ${d.lot} / ${d.rule.name}`;
 
@@ -655,7 +667,7 @@
       resBox.className = "ng";
       const topHtml = `<span class="c-red res-nowrap">🚨 불일치 ${d.pLotLabel}</span>`;
       const plainTop = `불일치 ${d.pLotLabel}`;
-      const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${d.qrWeight}kg (기준 ${d.rule.weight}kg)`, d.code, d.pLot, true)}</span>`;
+      const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${d.qrWeight}kg (기준 ${d.rule.weight}kg)`, d.code, d.pLot, { useRedWeight: true })}</span>`;
       const detailPlain = buildWeightSpecPlain(`${d.qrWeight}kg (기준 ${d.rule.weight}kg)`, d.code, d.pLot);
       const lotLineText = `LOT : ${d.lot} / ${d.rule.name}`;
 
@@ -696,7 +708,7 @@
         resBox.className = "ng";
         const topHtml = `<span class="c-red res-nowrap">⚠️ 미등록 ${pLotLabel}</span>`;
         const plainTop = `미등록 ${pLotLabel}`;
-        const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${qrWeight}kg`, code, pLot, true)}</span>`;
+        const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${qrWeight}kg`, code, pLot, { useRedWeight: true })}</span>`;
         const detailPlain = buildWeightSpecPlain(`${qrWeight}kg`, code, pLot);
         const lotLineText = `LOT : ${lot} / ${code}`;
         resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">${lotLineText}</span>`;
@@ -709,7 +721,7 @@
         resBox.className = "ok";
         const topHtml = `<span class="c-blue res-nowrap">✅ 정상 ${pLotLabel}</span>`;
         const plainTop = `정상 ${pLotLabel}`;
-        const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${rule.weight}kg`, code, pLot, false)}</span>`;
+        const detailHtml = `<span class="res-nowrap">${buildWeightSpecHtml(`${rule.weight}kg`, code, pLot)}</span>`;
         const detailPlain = buildWeightSpecPlain(`${rule.weight}kg`, code, pLot);
         const lotLineText = `LOT : ${lot} / ${rule.name}`;
         resBox.innerHTML = `${topHtml}<br>${detailHtml}<span class="sub c-black">${lotLineText}</span>`;
